@@ -2,7 +2,7 @@
 =============================================================
 Sends extracted PDF text to Google Gemini with a strictly
 defined JSON schema prompt.  Parses and validates the
-structured response.  Uses the new google-genai SDK.
+structured response.
 =============================================================
 """
 

@@ -1,16 +1,9 @@
-"""
-=============================================================
-Professional Streamlit interface with sidebar for project info
-and configuration, plus 3 main tabs:
-  1. Upload (multi-PDF batch)
-  2. Review & Edit Table (consolidated ledger)
-  3. Export & Sync (one-row-per-invoice Excel)
-=============================================================
-"""
 
 import streamlit as st
 import pandas as pd
 import time
+import base64
+import os
 from datetime import datetime
 
 # ─── Module Imports ──────────────────────────────────────────
@@ -25,110 +18,589 @@ from exporter import create_batch_excel_export
 # =============================================================
 st.set_page_config(
     page_title=f"{APP_TITLE} V{APP_VERSION}",
-    page_icon="🔄",
+    page_icon="⚙️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # =============================================================
-#                      CUSTOM CSS STYLING
+#                   LOGO HELPER
+# =============================================================
+LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "logo.png")
+
+
+def get_logo_base64():
+    """Return base64-encoded logo string for embedding in HTML."""
+    try:
+        with open(LOGO_PATH, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except FileNotFoundError:
+        return None
+
+def get_image_base64(filename):
+    """Return base64-encoded string for embedding any asset image in HTML."""
+    filepath = os.path.join(os.path.dirname(__file__), "assets", filename)
+    try:
+        with open(filepath, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except Exception as e:
+        logger.error(f"Error loading image {filename}: {e}")
+        return ""
+
+LOGO_B64 = get_logo_base64()
+UPLOAD_B64 = get_image_base64("upload.png")
+EXTRACT_B64 = get_image_base64("extract.png")
+AI_ANALYSIS_B64 = get_image_base64("ai_analysis.png")
+SKU_B64 = get_image_base64("sku.png")
+TALLY_B64 = get_image_base64("tally.webp")
+ZOHO_B64 = get_image_base64("zoho.png")
+ERP_B64 = get_image_base64("erp.png")
+
+# =============================================================
+#                  INDUSTRIAL DARK THEME CSS
 # =============================================================
 st.markdown("""
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-    /* ── Main container ───────────────────────────────── */
-    .main .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        max-width: 1200px;
+    /* ══════════════════════════════════════════════════════════
+       GLOBAL / ROOT
+       ══════════════════════════════════════════════════════════ */
+    :root {
+        --bg-primary:    #0d0d0d;
+        --bg-secondary:  #1a1a1a;
+        --bg-tertiary:   #252525;
+        --bg-card:       #1e1e1e;
+        --accent:        #FF6B00;
+        --accent-light:  #FFA500;
+        --accent-dim:    #cc5500;
+        --text-primary:  #FFFFFF;
+        --text-secondary:#B0B0B0;
+        --text-muted:    #6a6a6a;
+        --border:        #333333;
+        --border-light:  #444444;
+        --success:       #00C853;
+        --warning:       #FFB300;
+        --danger:        #FF1744;
+        --info:          #00B0FF;
     }
 
-    /* ── Sidebar ──────────────────────────────────────── */
+    /* ── Main app background ─────────────────────────────── */
+    .stApp, .main, [data-testid="stAppViewContainer"] {
+        background-color: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    .main .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+        max-width: 1300px;
+    }
+
+    /* ── Headings ─────────────────────────────────────────── */
+    h1, h2, h3, h4, h5, h6,
+    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+        font-family: 'Rajdhani', sans-serif !important;
+        font-weight: 700 !important;
+        color: var(--text-primary) !important;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+    }
+    p, span, label, .stMarkdown p {
+        font-family: 'Inter', sans-serif !important;
+        color: var(--text-secondary) !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SIDEBAR — Carbon-Fiber Dark
+       ══════════════════════════════════════════════════════════ */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        background: linear-gradient(180deg, #111111 0%, #0a0a0a 40%, #111111 100%) !important;
+        border-right: 2px solid var(--accent) !important;
+    }
+    [data-testid="stSidebar"]::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-image:
+            radial-gradient(circle at 1px 1px, rgba(255,107,0,0.03) 1px, transparent 0);
+        background-size: 20px 20px;
+        pointer-events: none;
     }
     [data-testid="stSidebar"] * {
-        color: #e0e0e0 !important;
+        color: #d0d0d0 !important;
     }
     [data-testid="stSidebar"] .stMarkdown h1,
     [data-testid="stSidebar"] .stMarkdown h2,
     [data-testid="stSidebar"] .stMarkdown h3 {
-        color: #ffffff !important;
+        color: var(--accent-light) !important;
+        text-shadow: 0 0 12px rgba(255,107,0,0.25);
+    }
+    [data-testid="stSidebar"] hr {
+        border-color: var(--border) !important;
+        opacity: 0.5;
+    }
+    /* Sidebar text inputs */
+    [data-testid="stSidebar"] .stTextInput input {
+        background-color: #1a1a1a !important;
+        border: 1px solid var(--border) !important;
+        color: var(--text-primary) !important;
+        border-radius: 6px;
+        font-family: 'JetBrains Mono', monospace !important;
+    }
+    [data-testid="stSidebar"] .stTextInput input:focus {
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 8px rgba(255,107,0,0.3) !important;
     }
 
-    /* ── Status badges ────────────────────────────────── */
+    /* ══════════════════════════════════════════════════════════
+       STATUS BADGES
+       ══════════════════════════════════════════════════════════ */
     .status-badge {
         display: inline-block;
-        padding: 4px 14px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        letter-spacing: 0.5px;
+        padding: 5px 16px;
+        border-radius: 4px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        font-family: 'Rajdhani', sans-serif;
+        border: 1px solid;
     }
     .badge-success {
-        background: linear-gradient(135deg, #00b894, #00cec9);
-        color: white;
+        background: rgba(0,200,83,0.12);
+        color: #00C853 !important;
+        border-color: rgba(0,200,83,0.4);
     }
     .badge-warning {
-        background: linear-gradient(135deg, #fdcb6e, #e17055);
-        color: white;
+        background: rgba(255,179,0,0.12);
+        color: #FFB300 !important;
+        border-color: rgba(255,179,0,0.4);
     }
     .badge-info {
-        background: linear-gradient(135deg, #74b9ff, #0984e3);
-        color: white;
+        background: rgba(0,176,255,0.12);
+        color: #00B0FF !important;
+        border-color: rgba(0,176,255,0.4);
+    }
+    .badge-danger {
+        background: rgba(255,23,68,0.12);
+        color: #FF1744 !important;
+        border-color: rgba(255,23,68,0.4);
+    }
+    .badge-steel {
+        background: rgba(255,107,0,0.08);
+        color: var(--accent) !important;
+        border-color: rgba(255,107,0,0.35);
     }
 
-    /* ── Metric cards ─────────────────────────────────── */
+    /* ══════════════════════════════════════════════════════════
+       METRIC CARDS — Steel Framed
+       ══════════════════════════════════════════════════════════ */
     div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-        border: 1px solid #dee2e6;
-        border-radius: 12px;
-        padding: 16px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        background: linear-gradient(135deg, #1a1a1a 0%, #222222 100%) !important;
+        border: 1px solid var(--border) !important;
+        border-left: 3px solid var(--accent) !important;
+        border-radius: 8px !important;
+        padding: 18px !important;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        transition: all 0.3s ease;
+    }
+    div[data-testid="stMetric"]:hover {
+        border-color: var(--accent) !important;
+        box-shadow: 0 4px 20px rgba(255,107,0,0.15);
+        transform: translateY(-1px);
+    }
+    div[data-testid="stMetric"] label {
+        color: var(--text-muted) !important;
+        font-family: 'Rajdhani', sans-serif !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        font-size: 0.78rem !important;
+    }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: var(--text-primary) !important;
+        font-family: 'Rajdhani', sans-serif !important;
+        font-weight: 700 !important;
     }
 
-    /* ── Tab styling ──────────────────────────────────── */
+    /* ══════════════════════════════════════════════════════════
+       TABS — Industrial
+       ══════════════════════════════════════════════════════════ */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+        gap: 0px;
+        background-color: var(--bg-secondary);
+        border-radius: 8px 8px 0 0;
+        border-bottom: 2px solid var(--accent);
+        padding: 0;
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius: 8px 8px 0 0;
-        padding: 10px 24px;
-        font-weight: 600;
+        border-radius: 0;
+        padding: 14px 28px;
+        font-weight: 700;
+        font-family: 'Rajdhani', sans-serif !important;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-size: 0.9rem;
+        color: var(--text-muted) !important;
+        background-color: transparent;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s ease;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        color: var(--accent-light) !important;
+        background-color: rgba(255,107,0,0.06);
+    }
+    .stTabs [aria-selected="true"] {
+        color: var(--accent) !important;
+        border-bottom: 3px solid var(--accent) !important;
+        background-color: rgba(255,107,0,0.08) !important;
+    }
+    .stTabs [data-baseweb="tab-highlight"] {
+        background-color: var(--accent) !important;
+    }
+    .stTabs [data-baseweb="tab-panel"] {
+        background-color: var(--bg-primary);
+        padding-top: 1.5rem;
     }
 
-    /* ── Upload zone ──────────────────────────────────── */
+    /* ══════════════════════════════════════════════════════════
+       FILE UPLOADER — Amber Dashed
+       ══════════════════════════════════════════════════════════ */
     [data-testid="stFileUploader"] {
-        border: 2px dashed #74b9ff;
-        border-radius: 12px;
-        padding: 20px;
-        background: #f0f7ff;
+        border: 2px dashed var(--accent) !important;
+        border-radius: 10px;
+        padding: 24px;
+        background: rgba(255,107,0,0.03) !important;
+        transition: all 0.3s ease;
+    }
+    [data-testid="stFileUploader"]:hover {
+        background: rgba(255,107,0,0.06) !important;
+        box-shadow: 0 0 20px rgba(255,107,0,0.1);
+    }
+    [data-testid="stFileUploader"] * {
+        color: var(--text-secondary) !important;
     }
 
-    /* ── Header banner ────────────────────────────────── */
+    /* ══════════════════════════════════════════════════════════
+       BUTTONS — Industrial Amber
+       ══════════════════════════════════════════════════════════ */
+    .stButton > button[kind="primary"],
+    .stDownloadButton > button {
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-family: 'Rajdhani', sans-serif !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1.5px !important;
+        font-size: 0.95rem !important;
+        padding: 12px 28px !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 14px rgba(255,107,0,0.3) !important;
+    }
+    .stButton > button[kind="primary"]:hover,
+    .stDownloadButton > button:hover {
+        background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%) !important;
+        box-shadow: 0 6px 22px rgba(255,107,0,0.45) !important;
+        transform: translateY(-1px) !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       HERO BANNER — Dark Steel
+       ══════════════════════════════════════════════════════════ */
     .hero-banner {
-        background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
-        padding: 24px 32px;
-        border-radius: 16px;
-        margin-bottom: 24px;
-        box-shadow: 0 4px 20px rgba(44,62,80,0.3);
+        background: linear-gradient(135deg, #111111 0%, #1a1a1a 50%, #0d0d0d 100%);
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--accent);
+        padding: 28px 36px;
+        border-radius: 10px;
+        margin-bottom: 28px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        position: relative;
+        overflow: hidden;
     }
-    .hero-banner h1 {
-        color: white !important;
+    .hero-banner::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0;
+        width: 250px; height: 100%;
+        background: linear-gradient(135deg, transparent 0%, rgba(255,107,0,0.04) 100%);
+        pointer-events: none;
+    }
+    .hero-banner .hero-content {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+    .hero-banner .hero-logo img {
+        height: 44px;
+        mix-blend-mode: screen;
+        filter: contrast(1.2);
+    }
+    .hero-banner .hero-text h1 {
+        color: #FFFFFF !important;
         margin: 0 !important;
-        font-size: 2rem !important;
+        font-size: 1.8rem !important;
+        font-family: 'Rajdhani', sans-serif !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 3px !important;
+        line-height: 1 !important;
     }
-    .hero-banner p {
-        color: #bdc3c7 !important;
-        margin: 4px 0 0 0 !important;
+    .hero-banner .hero-text .hero-accent {
+        color: var(--accent) !important;
+    }
+    .hero-banner .hero-text p {
+        color: var(--text-muted) !important;
+        margin: 6px 0 0 0 !important;
+        font-size: 0.88rem !important;
+        letter-spacing: 2px !important;
+        text-transform: uppercase !important;
+        font-family: 'Rajdhani', sans-serif !important;
     }
 
-    /* ── Process steps ────────────────────────────────── */
+    /* ══════════════════════════════════════════════════════════
+       PROCESS STEPS — Industrial Cards
+       ══════════════════════════════════════════════════════════ */
     .process-step {
-        background: #f8f9fa;
-        border-left: 4px solid #3498db;
-        padding: 12px 16px;
+        background: linear-gradient(135deg, #1a1a1a 0%, #222 100%);
+        border: 1px solid var(--border);
+        border-top: 3px solid var(--accent);
+        padding: 18px 16px;
         margin: 8px 0;
-        border-radius: 0 8px 8px 0;
+        border-radius: 0 0 8px 8px;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    .process-step:hover {
+        border-top-color: var(--accent-light);
+        box-shadow: 0 4px 16px rgba(255,107,0,0.12);
+        transform: translateY(-2px);
+    }
+    .process-step .step-icon {
+        font-size: 1.8rem;
+        display: block;
+        margin-bottom: 8px;
+    }
+    .process-step .step-icon img {
+        height: 38px;
+        width: auto;
+        opacity: 0.9;
+        transition: transform 0.3s ease;
+    }
+    .process-step:hover .step-icon img {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+    .process-step .step-num {
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 700;
+        font-size: 0.7rem;
+        color: var(--accent) !important;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        display: block;
+        margin-bottom: 4px;
+    }
+    .process-step .step-label {
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--text-primary) !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       EXPANDERS
+       ══════════════════════════════════════════════════════════ */
+    details, .streamlit-expanderHeader, [data-testid="stExpander"] {
+        background-color: var(--bg-secondary) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 6px !important;
+        color: var(--text-primary) !important;
+    }
+    [data-testid="stExpander"] summary .stMarkdown {
+        color: var(--text-primary) !important;
+        font-family: 'Rajdhani', sans-serif !important;
+        font-weight: 600 !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       DATA FRAMES / TABLES
+       ══════════════════════════════════════════════════════════ */
+    [data-testid="stDataFrame"],
+    .stDataFrame {
+        border: 1px solid var(--border) !important;
+        border-radius: 6px !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       DIVIDERS
+       ══════════════════════════════════════════════════════════ */
+    hr {
+        border-color: var(--border) !important;
+        opacity: 0.4;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       ERP COMPAT CARD
+       ══════════════════════════════════════════════════════════ */
+    .erp-card {
+        background: linear-gradient(135deg, #1a1a1a 0%, #222 100%);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    .erp-card:hover {
+        border-color: var(--accent);
+        box-shadow: 0 4px 16px rgba(255,107,0,0.1);
+    }
+    .erp-card .erp-icon {
+        font-size: 2rem;
+        display: block;
+        margin-bottom: 8px;
+    }
+    .erp-card .erp-icon img {
+        height: 48px;
+        width: auto;
+        border-radius: 4px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .erp-card .erp-name {
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--text-primary) !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .erp-card .erp-status {
+        font-size: 0.75rem;
+        margin-top: 6px;
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 3px;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       FOOTER
+       ══════════════════════════════════════════════════════════ */
+    .industrial-footer {
+        background: var(--bg-secondary);
+        border-top: 2px solid var(--accent);
+        padding: 16px 0;
+        margin-top: 2rem;
+        text-align: center;
+    }
+    .industrial-footer p {
+        color: var(--text-muted) !important;
+        font-family: 'Rajdhani', sans-serif !important;
+        font-size: 0.8rem !important;
+        letter-spacing: 2px !important;
+        text-transform: uppercase !important;
+        margin: 0 !important;
+    }
+    .industrial-footer .footer-accent {
+        color: var(--accent) !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       ALERTS — Override Streamlit defaults
+       ══════════════════════════════════════════════════════════ */
+    .stAlert, [data-testid="stAlert"] {
+        background-color: var(--bg-secondary) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 6px !important;
+    }
+    /* success alerts */
+    div[data-baseweb="notification"][kind="positive"],
+    .element-container .stSuccess {
+        border-left: 3px solid var(--success) !important;
+    }
+    /* info alerts */
+    div[data-baseweb="notification"][kind="info"],
+    .element-container .stInfo {
+        border-left: 3px solid var(--info) !important;
+    }
+    /* warning alerts */
+    div[data-baseweb="notification"][kind="warning"],
+    .element-container .stWarning {
+        border-left: 3px solid var(--warning) !important;
+    }
+    /* error alerts */
+    div[data-baseweb="notification"][kind="negative"],
+    .element-container .stError {
+        border-left: 3px solid var(--danger) !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       PROGRESS BAR
+       ══════════════════════════════════════════════════════════ */
+    .stProgress > div > div > div > div {
+        background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light) 100%) !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SECTION HEADER
+       ══════════════════════════════════════════════════════════ */
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .section-header .section-icon {
+        font-size: 1.4rem;
+        width: 42px;
+        height: 42px;
+        background: rgba(255,107,0,0.1);
+        border: 1px solid rgba(255,107,0,0.3);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .section-header .section-title {
+        font-family: 'Rajdhani', sans-serif !important;
+        font-weight: 700;
+        font-size: 1.3rem;
+        color: var(--text-primary) !important;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        margin: 0 !important;
+    }
+    .section-header .section-subtitle {
+        font-size: 0.82rem;
+        color: var(--text-muted) !important;
+        margin: 2px 0 0 0 !important;
+        letter-spacing: 0.5px;
+    }
+
+    /* Architecture table in sidebar */
+    [data-testid="stSidebar"] table {
+        background-color: rgba(26,26,26,0.8) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 6px;
+    }
+    [data-testid="stSidebar"] th {
+        background-color: rgba(255,107,0,0.12) !important;
+        color: var(--accent-light) !important;
+        font-family: 'Rajdhani', sans-serif !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+    }
+    [data-testid="stSidebar"] td {
+        border-color: var(--border) !important;
+    }
+
+    /* caption */
+    .stCaption, [data-testid="stCaptionContainer"] {
+        color: var(--text-muted) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -153,70 +625,26 @@ def init_session_state():
 init_session_state()
 
 
-# =============================================================
-#                         SIDEBAR
-# =============================================================
-with st.sidebar:
-    # ── Project Info ──
-    st.markdown("## 🔄 Flowledger")
-    st.markdown(f"**Version** `{APP_VERSION}`")
-    st.markdown(f"_{APP_DESCRIPTION}_")
-    st.divider()
-
-    # ── Configuration ──
-    st.markdown("### ⚙️ Configuration")
-    api_key_input = st.text_input(
-        "Google Gemini API Key",
-        type="password",
-        placeholder="Enter your API key...",
-        help="Get your key from https://aistudio.google.com/app/apikey",
-        key="api_key_widget",
-    )
-
-    api_key = get_api_key(override=api_key_input)
-    if api_key:
-        st.success("✅ API Key configured", icon="🔑")
-    else:
-        st.warning("⚠️ API Key required", icon="🔑")
-
-    st.divider()
-
-    # ── Architecture Info ──
-    st.markdown("### 🏗️ Architecture")
-    st.markdown("""
-    | Module | Purpose |
-    |--------|---------|
-    | `config` | API keys & env vars |
-    | `extractor` | PDF → text |
-    | `ai_engine` | Text → JSON (Gemini) |
-    | `mapper` | SKU matching |
-    | `exporter` | JSON → Excel |
-    | `app` | Streamlit UI |
-    """)
-
-    st.divider()
-
-    # ── Pipeline Status ──
-    st.markdown("### 📊 Pipeline Status")
-    inv_count = len(st.session_state.processed_invoices)
-    if st.session_state.processing_complete and inv_count > 0:
-        st.markdown(
-            f'<span class="status-badge badge-success">✅ {inv_count} invoice(s)</span>',
-            unsafe_allow_html=True,
-        )
-    elif inv_count > 0:
-        st.markdown('<span class="status-badge badge-warning">⏳ In Progress</span>', unsafe_allow_html=True)
-    else:
-        st.markdown('<span class="status-badge badge-info">💤 Idle</span>', unsafe_allow_html=True)
-
+from datetime import datetime
+from config import BUSINESS_NAME, GST_NO, VIEWER_USERNAME
 
 # =============================================================
 #                       HERO BANNER
 # =============================================================
-st.markdown("""
-<div class="hero-banner">
-    <h1>🔄 Flowledger V1.0</h1>
-    <p>AI-Driven Batch Invoice Scanner → Consolidated ERP Ledger</p>
+current_date = datetime.now().strftime("%d %b %Y")
+
+st.markdown(f"""
+<div class="hero-banner" style="display: flex; justify-content: space-between; align-items: flex-end;">
+    <div class="hero-text">
+        <h1>FLOW<span class="hero-accent">LEDGER</span> <span style="font-size:0.5em; color:#6a6a6a; vertical-align: middle;">V{APP_VERSION}</span></h1>
+        <p>AI-Driven Batch Invoice Scanner → Consolidated ERP Ledger</p>
+    </div>
+    <div class="hero-right" style="text-align: right; color: #a1a1aa; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; font-size: 0.9rem; text-transform: uppercase; line-height: 1.4;">
+        <div>{BUSINESS_NAME}</div>
+        <div>GSTIN: {GST_NO}</div>
+        <div>{current_date}</div>
+        <div style="color: var(--accent); margin-top: 4px;">👤 {VIEWER_USERNAME}</div>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -225,31 +653,54 @@ st.markdown("""
 #                       MAIN TABS
 # =============================================================
 tab_upload, tab_review, tab_export = st.tabs([
-    "📤  1. Upload",
-    "📝  2. Review & Edit Table",
-    "📥  3. Export & Sync",
+    "⬆  UPLOAD",
+    "📋  REVIEW & EDIT",
+    "⬇  EXPORT & SYNC",
 ])
 
 # ─────────────────────────────────────────────────────────────
 #                     TAB 1: UPLOAD
 # ─────────────────────────────────────────────────────────────
 with tab_upload:
-    st.markdown("### 📄 Upload Invoice PDFs (Batch)")
-    st.markdown(
-        "Upload **one or multiple** Invoice/PO PDFs. Flowledger will process each one and "
-        "create a **consolidated ledger** — one row per invoice in the exported Excel."
-    )
+    api_key = get_api_key()
+
+
+    st.markdown("""
+    <div class="section-header" style="margin-top: 20px;">
+        <div class="section-icon">📄</div>
+        <div>
+            <p class="section-title">Upload Invoice PDFs</p>
+            <p class="section-subtitle">Batch upload — process multiple invoices simultaneously</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Process steps visualization
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.markdown('<div class="process-step">📄 <b>Step 1</b><br>Upload PDFs</div>', unsafe_allow_html=True)
+        st.markdown(f"""<div class="process-step">
+            <span class="step-icon"><img src="data:image/png;base64,{UPLOAD_B64}" alt="Upload"></span>
+            <span class="step-num">Step 01</span>
+            <span class="step-label">Upload PDFs</span>
+        </div>""", unsafe_allow_html=True)
     with col2:
-        st.markdown('<div class="process-step">🔍 <b>Step 2</b><br>Extract Text</div>', unsafe_allow_html=True)
+        st.markdown(f"""<div class="process-step">
+            <span class="step-icon"><img src="data:image/png;base64,{EXTRACT_B64}" alt="Extract"></span>
+            <span class="step-num">Step 02</span>
+            <span class="step-label">Extract Text</span>
+        </div>""", unsafe_allow_html=True)
     with col3:
-        st.markdown('<div class="process-step">🤖 <b>Step 3</b><br>AI Analysis</div>', unsafe_allow_html=True)
+        st.markdown(f"""<div class="process-step">
+            <span class="step-icon"><img src="data:image/png;base64,{AI_ANALYSIS_B64}" alt="AI Analysis"></span>
+            <span class="step-num">Step 03</span>
+            <span class="step-label">AI Analysis</span>
+        </div>""", unsafe_allow_html=True)
     with col4:
-        st.markdown('<div class="process-step">✅ <b>Step 4</b><br>SKU Mapping</div>', unsafe_allow_html=True)
+        st.markdown(f"""<div class="process-step">
+            <span class="step-icon"><img src="data:image/png;base64,{SKU_B64}" alt="SKU Mapping"></span>
+            <span class="step-num">Step 04</span>
+            <span class="step-label">SKU Mapping</span>
+        </div>""", unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -264,11 +715,11 @@ with tab_upload:
     if uploaded_files:
         st.info(f"📎 **{len(uploaded_files)} file(s)** selected for processing.", icon="📎")
         for f in uploaded_files:
-            st.caption(f"  • {f.name} — {len(f.getvalue()) / 1024:.1f} KB")
+            st.caption(f"  ▸ {f.name} — {len(f.getvalue()) / 1024:.1f} KB")
 
-        if st.button("🚀 Process All Invoices", type="primary", use_container_width=True):
+        if st.button("⚡ PROCESS ALL INVOICES", type="primary", use_container_width=True):
             if not api_key:
-                st.error("❌ Please enter your Google Gemini API Key in the sidebar.", icon="🔑")
+                st.error("❌ Please enter your Groq API Key in the sidebar.", icon="🔑")
             else:
                 # Reset state for new batch
                 st.session_state.processed_invoices = []
@@ -281,7 +732,7 @@ with tab_upload:
                     file_name = pdf_file.name
                     st.markdown(f"---")
 
-                    with st.status(f"📄 [{idx+1}/{total}] Processing **{file_name}**...", expanded=True) as status:
+                    with st.status(f"⚙️ [{idx+1}/{total}] Processing **{file_name}**...", expanded=True) as status:
                         try:
                             # Step 1: Extract text
                             st.write(f"🔍 Extracting text from `{file_name}`...")
@@ -290,7 +741,7 @@ with tab_upload:
                             st.write(f"✅ Extracted **{len(extracted_text)}** characters.")
 
                             # Step 2: AI Analysis
-                            st.write(f"🤖 Analyzing with Gemini...")
+                            st.write(f"🤖 Analyzing with Groq...")
                             po_data = analyze_purchase_order(extracted_text, api_key)
                             st.write(f"✅ Vendor: **{po_data.get('vendor_name', 'N/A')}** | Invoice#: **{po_data.get('invoice_no', 'N/A')}**")
 
@@ -306,16 +757,16 @@ with tab_upload:
                             po_data["file_name"] = file_name
 
                             st.session_state.processed_invoices.append(po_data)
-                            status.update(label=f"✅ [{idx+1}/{total}] {file_name} — done!", state="complete")
+                            status.update(label=f"✅ [{idx+1}/{total}] {file_name} — Complete", state="complete")
 
                         except (PDFExtractionError, AIAnalysisError) as e:
                             st.session_state.failed_files.append({"file": file_name, "error": str(e)})
-                            status.update(label=f"❌ [{idx+1}/{total}] {file_name} — failed", state="error")
+                            status.update(label=f"❌ [{idx+1}/{total}] {file_name} — Failed", state="error")
                             st.error(f"{file_name}: {str(e)}", icon="❌")
 
                         except Exception as e:
                             st.session_state.failed_files.append({"file": file_name, "error": str(e)})
-                            status.update(label=f"❌ [{idx+1}/{total}] {file_name} — failed", state="error")
+                            status.update(label=f"❌ [{idx+1}/{total}] {file_name} — Failed", state="error")
                             st.error(f"{file_name}: Unexpected error — {str(e)}", icon="❌")
 
                     progress.progress(
@@ -343,15 +794,29 @@ with tab_upload:
 #                  TAB 2: REVIEW & EDIT
 # ─────────────────────────────────────────────────────────────
 with tab_review:
-    st.markdown("### 📊 Review Extracted Invoices")
+    st.markdown("""
+    <div class="section-header">
+        <div class="section-icon">📊</div>
+        <div>
+            <p class="section-title">Review Extracted Invoices</p>
+            <p class="section-subtitle">Inspect, verify, and edit AI-extracted data before export</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     invoices = st.session_state.processed_invoices
 
     if not st.session_state.processing_complete or not invoices:
-        st.info("📤 Please upload and process PDF(s) in the **Upload** tab first.", icon="⬅️")
+        st.info("⬅️ Please upload and process PDF(s) in the **Upload** tab first.", icon="📤")
     else:
         # ── Batch Summary Metrics ──
-        st.markdown("#### 📈 Batch Summary")
+        st.markdown("""
+        <div class="section-header">
+            <div class="section-icon">📈</div>
+            <div><p class="section-title">Batch Summary</p></div>
+        </div>
+        """, unsafe_allow_html=True)
+
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Invoices Processed", len(invoices))
@@ -368,8 +833,15 @@ with tab_review:
         st.divider()
 
         # ── Invoice Ledger Table (one row per invoice) ──
-        st.markdown("#### 📋 Invoice Ledger (one row per invoice)")
-        st.caption("This is the format that will be exported to Excel.")
+        st.markdown("""
+        <div class="section-header">
+            <div class="section-icon">📋</div>
+            <div>
+                <p class="section-title">Invoice Ledger</p>
+                <p class="section-subtitle">One row per invoice — exported format</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
         ledger_data = []
         for inv in invoices:
@@ -414,7 +886,13 @@ with tab_review:
         st.divider()
 
         # ── Detailed view per invoice (expandable) ──
-        st.markdown("#### 🔎 Invoice Details (expandable)")
+        st.markdown("""
+        <div class="section-header">
+            <div class="section-icon">🔎</div>
+            <div><p class="section-title">Invoice Details</p></div>
+        </div>
+        """, unsafe_allow_html=True)
+
         for i, inv in enumerate(invoices):
             with st.expander(
                 f"📄 {inv.get('file_name', '')} — {inv.get('vendor_name', 'N/A')} | "
@@ -448,7 +926,12 @@ with tab_review:
         # ── Failed files (if any) ──
         if st.session_state.failed_files:
             st.divider()
-            st.markdown("#### ❌ Failed Files")
+            st.markdown("""
+            <div class="section-header">
+                <div class="section-icon">❌</div>
+                <div><p class="section-title">Failed Files</p></div>
+            </div>
+            """, unsafe_allow_html=True)
             for fail in st.session_state.failed_files:
                 st.error(f"**{fail['file']}**: {fail['error']}", icon="❌")
 
@@ -457,12 +940,20 @@ with tab_review:
 #                   TAB 3: EXPORT & SYNC
 # ─────────────────────────────────────────────────────────────
 with tab_export:
-    st.markdown("### 📥 Export & Sync to ERP")
+    st.markdown("""
+    <div class="section-header">
+        <div class="section-icon">📥</div>
+        <div>
+            <p class="section-title">Export & Sync to ERP</p>
+            <p class="section-subtitle">Download consolidated Excel or sync directly with your ERP</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     invoices = st.session_state.processed_invoices
 
     if not st.session_state.processing_complete or not invoices:
-        st.info("📤 Please upload and process PDF(s) first.", icon="⬅️")
+        st.info("⬅️ Please upload and process PDF(s) first.", icon="📤")
     else:
         st.markdown(
             f"Download **{len(invoices)} invoice(s)** as a consolidated Excel ledger "
@@ -471,23 +962,48 @@ with tab_export:
 
         st.divider()
 
-        # ── ERP Compatibility Badges ──
-        st.markdown("#### 🔗 ERP Compatibility")
+        # ── ERP Compatibility Cards ──
+        st.markdown("""
+        <div class="section-header">
+            <div class="section-icon">🔗</div>
+            <div><p class="section-title">ERP Compatibility</p></div>
+        </div>
+        """, unsafe_allow_html=True)
+
         badge_col1, badge_col2, badge_col3 = st.columns(3)
         with badge_col1:
-            st.markdown('<span class="status-badge badge-success">✅ Tally Prime</span>', unsafe_allow_html=True)
+            st.markdown(f"""<div class="erp-card">
+                <span class="erp-icon"><img src="data:image/webp;base64,{TALLY_B64}" alt="Tally Prime"></span>
+                <span class="erp-name">Tally Prime</span><br>
+                <span class="erp-status badge-success">● Compatible</span>
+            </div>""", unsafe_allow_html=True)
         with badge_col2:
-            st.markdown('<span class="status-badge badge-success">✅ Zoho Books</span>', unsafe_allow_html=True)
+            st.markdown(f"""<div class="erp-card">
+                <span class="erp-icon"><img src="data:image/png;base64,{ZOHO_B64}" alt="Zoho Books"></span>
+                <span class="erp-name">Zoho Books</span><br>
+                <span class="erp-status badge-success">● Compatible</span>
+            </div>""", unsafe_allow_html=True)
         with badge_col3:
-            st.markdown('<span class="status-badge badge-info">ℹ️ Custom ERP</span>', unsafe_allow_html=True)
+            st.markdown(f"""<div class="erp-card">
+                <span class="erp-icon"><img src="data:image/png;base64,{ERP_B64}" alt="Custom ERP"></span>
+                <span class="erp-name">Custom ERP</span><br>
+                <span class="erp-status badge-info">● Configurable</span>
+            </div>""", unsafe_allow_html=True)
 
         st.divider()
 
         # ── Excel Format Preview ──
-        st.markdown("#### 📋 Excel Structure")
         st.markdown("""
-        The exported Excel contains **2 sheets**:
+        <div class="section-header">
+            <div class="section-icon">📋</div>
+            <div>
+                <p class="section-title">Excel Structure</p>
+                <p class="section-subtitle">Two-sheet workbook format</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
+        st.markdown("""
         | Sheet | Content |
         |-------|---------|
         | **Invoice Ledger** | One row per invoice — all header fields + totals |
@@ -497,7 +1013,13 @@ with tab_export:
         st.divider()
 
         # ── Pre-Export Validation ──
-        st.markdown("#### 🔍 Pre-Export Validation")
+        st.markdown("""
+        <div class="section-header">
+            <div class="section-icon">🔍</div>
+            <div><p class="section-title">Pre-Export Validation</p></div>
+        </div>
+        """, unsafe_allow_html=True)
+
         issues = []
         for inv in invoices:
             fname = inv.get("file_name", "?")
@@ -519,7 +1041,12 @@ with tab_export:
         st.divider()
 
         # ── Generate & Download ──
-        st.markdown("#### 💾 Download Excel")
+        st.markdown("""
+        <div class="section-header">
+            <div class="section-icon">💾</div>
+            <div><p class="section-title">Download Excel</p></div>
+        </div>
+        """, unsafe_allow_html=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"Flowledger_Batch_{len(invoices)}inv_{timestamp}.xlsx"
@@ -528,7 +1055,7 @@ with tab_export:
             excel_buffer = create_batch_excel_export(invoices)
 
             st.download_button(
-                label="⬇️  Download Consolidated Excel",
+                label="⬇️  DOWNLOAD CONSOLIDATED EXCEL",
                 data=excel_buffer,
                 file_name=filename,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.document",
@@ -544,7 +1071,13 @@ with tab_export:
         st.divider()
 
         # ── Final Summary ──
-        st.markdown("#### 📊 Export Summary")
+        st.markdown("""
+        <div class="section-header">
+            <div class="section-icon">📊</div>
+            <div><p class="section-title">Export Summary</p></div>
+        </div>
+        """, unsafe_allow_html=True)
+
         s1, s2, s3, s4 = st.columns(4)
         with s1:
             st.metric("Invoices", len(invoices))
@@ -561,14 +1094,15 @@ with tab_export:
 # =============================================================
 #                         FOOTER
 # =============================================================
-st.divider()
-st.markdown(
-    f"""
-    <div style="text-align: center; color: #7f8c8d; font-size: 0.85rem; padding: 8px 0;">
-        <b>{APP_TITLE} V{APP_VERSION}</b> — AI-Driven Batch Invoice Scanner
-        &nbsp;|&nbsp; Built with Streamlit + Google Gemini
-        &nbsp;|&nbsp; © {datetime.now().year}
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+st.markdown(f"""
+<div class="industrial-footer">
+    <p>
+        <span class="footer-accent">■</span> &nbsp;
+        {APP_TITLE} V{APP_VERSION} &mdash; AI-Driven Batch Invoice Scanner
+        &nbsp;|&nbsp; Built with Streamlit + Groq
+        &nbsp;|&nbsp; &copy; {datetime.now().year}
+        &nbsp; <span class="footer-accent">■</span>
+    </p>
+</div>
+""", unsafe_allow_html=True)
+# triggering reload

@@ -19,6 +19,12 @@ APP_DESCRIPTION = (
     "Purchase Orders (PDFs) into structured ERP data."
 )
 
+# Business Info (Configurable via .env or defaults)
+BUSINESS_NAME = os.environ.get("BUSINESS_NAME", "ACME Corporation Ltd.")
+GST_NO = os.environ.get("GST_NO", "27AAAAA0000A1Z5")
+VIEWER_USERNAME = os.environ.get("VIEWER_USERNAME", "admin_user")
+
+
 # --------------- Google Gemini Settings ---------------
 GEMINI_MODEL = "gemini-3-flash-preview"
 GEMINI_TEMPERATURE = 0.2          # Why Low temp ? → deterministic JSON output (Less Variability)

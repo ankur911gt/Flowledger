@@ -1,4 +1,4 @@
-# ⚙️ Flowledger V1.0.0
+# Flowledger V1.0.0
 ### AI-Driven Batch Invoice Scanner → Consolidated ERP Ledger
 
 Flowledger is a premium, industrial-grade data extraction tool designed to automate the transition from digital PDF invoices to structured ERP-ready entries. Powered by the Groq LPU™ Inference Engine, it processes batch uploads with high precision, mapping line items to internal SKUs.
@@ -15,7 +15,7 @@ Flowledger is a premium, industrial-grade data extraction tool designed to autom
 <details>
   <summary>Click to view Flowledger in action</summary>
   <br>
-  <img src="assets/demo1.png" width="800" alt="Flowledger Demo 1">
+  <img src="https://github.com/ankurraj2003/Flowledger/blob/main/assets/demo1.png?raw=true" width="800" alt="Flowledger Demo 1">
   <br>
   <img src="assets/demo2.png" width="800" alt="Flowledger Demo 2">
   <br>

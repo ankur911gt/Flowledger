@@ -3,24 +3,17 @@
 
 Flowledger is a premium, industrial-grade data extraction tool designed to automate the transition from digital PDF invoices to structured ERP-ready entries. Powered by the Groq LPU™ Inference Engine, it processes batch uploads with high precision, mapping line items to internal SKUs.
 
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)
 ![Groq](https://img.shields.io/badge/Groq_LLM-f36036?style=for-the-badge&logo=Groq&logoColor=white)
 ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-
 ---
 
 ## 📷 Screenshots
 
-<details>
-  <summary>Click to view Flowledger in action</summary>
-  <br>
-  <img src="https://github.com/ankurraj2003/Flowledger/blob/main/assets/demo1.png?raw=true" width="800" alt="Flowledger Demo 1">
-  <br>
-  <img src="assets/demo2.png" width="800" alt="Flowledger Demo 2">
-  <br>
-  <img src="assets/demo3.png" width="800" alt="Flowledger Demo 3">
-</details>
+![](https://github.com/ankurraj2003/Flowledger/blob/main/assets/demo1.png?raw=true)
+![](https://github.com/ankurraj2003/Flowledger/blob/main/assets/demo2.png?raw=true)
+![](https://github.com/ankurraj2003/Flowledger/blob/main/assets/demo3.png?raw=true)
 
 ---
 
@@ -91,4 +84,3 @@ The app will be available at `http://localhost:8501`.
 - **API Security**: Your Groq API key is managed locally via environment variables.
 
 ---
-*Built with ❤️ for industrial automation.*
